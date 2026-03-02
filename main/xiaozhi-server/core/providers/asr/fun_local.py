@@ -103,8 +103,9 @@ class ASRProvider(ASRProviderBase):
                     batch_size_s=60,
                 )
                 text = lang_tag_filter(result[0]["text"])
+                content = text["content"] if isinstance(text, dict) else text
                 logger.bind(tag=TAG).debug(
-                    f"语音识别耗时: {time.time() - start_time:.3f}s | 结果: {text['content']}"
+                    f"语音识别耗时: {time.time() - start_time:.3f}s | 结果: {content}"
                 )
 
                 return text, file_path

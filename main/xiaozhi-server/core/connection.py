@@ -138,6 +138,10 @@ class ConnectionHandler:
         self.llm_finish_task = True
         self.dialogue = Dialogue()
 
+        # 视觉上下文（摄像头拍照分析结果）
+        self.visual_context = None
+        self.visual_context_time = 0
+
         # tts相关变量
         self.sentence_id = None
         # 处理TTS响应没有文本返回
@@ -801,6 +805,12 @@ class ConnectionHandler:
         if depth == 0:
             self.llm_finish_task = False
             self.sentence_id = str(uuid.uuid4().hex)
+
+            # 注入视觉上下文（摄像头拍照分析结果，30秒内有效）
+            if self.visual_context and time.time() - self.visual_context_time < 30:
+                query = f"[用户当前状态: {self.visual_context}] {query}"
+                self.visual_context = None  # 用完即清，避免重复注入
+
             self.dialogue.put(Message(role="user", content=query))
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(

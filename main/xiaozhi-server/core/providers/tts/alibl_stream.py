@@ -22,6 +22,8 @@ class TTSProvider(TTSProviderBase):
         super().__init__(config, delete_audio_file)
 
         self.interface_type = InterfaceType.DUAL_STREAM
+        # 双工流式TTS：所有句子都在逗号处断句，保持TTS持续有文本合成
+        self.punctuations = self.first_sentence_punctuations
         # 基础配置
         self.api_key = config.get("api_key")
         if not self.api_key:
@@ -108,7 +110,7 @@ class TTSProvider(TTSProviderBase):
                 if message.sentence_type == SentenceType.FIRST:
                     # 初始化会话
                     try:
-                        if not getattr(self.conn, "sentence_id", None): 
+                        if not getattr(self.conn, "sentence_id", None):
                             self.conn.sentence_id = uuid.uuid4().hex
                             logger.bind(tag=TAG).info(f"自动生成新的 会话ID: {self.conn.sentence_id}")
 
@@ -119,6 +121,10 @@ class TTSProvider(TTSProviderBase):
                         )
                         future.result()
                         self.before_stop_play_files.clear()
+                        # 初始化断句缓冲
+                        self.tts_text_buff = []
+                        self.processed_chars = 0
+                        self.is_first_sentence = True
                         logger.bind(tag=TAG).info("TTS会话启动成功")
                     except Exception as e:
                         logger.bind(tag=TAG).error(f"启动TTS会话失败: {str(e)}")
@@ -126,19 +132,23 @@ class TTSProvider(TTSProviderBase):
 
                 elif ContentType.TEXT == message.content_type:
                     if message.content_detail:
-                        try:
-                            logger.bind(tag=TAG).debug(
-                                f"开始发送TTS文本: {message.content_detail}"
-                            )
-                            future = asyncio.run_coroutine_threadsafe(
-                                self.text_to_speak(message.content_detail, None),
-                                loop=self.conn.loop,
-                            )
-                            future.result()
-                            logger.bind(tag=TAG).debug("TTS文本发送成功")
-                        except Exception as e:
-                            logger.bind(tag=TAG).error(f"发送TTS文本失败: {str(e)}")
-                            continue
+                        # 使用断句缓冲，攒到标点符号再发送，避免卡顿
+                        self.tts_text_buff.append(message.content_detail)
+                        segment_text = self._get_segment_text()
+                        if segment_text:
+                            try:
+                                logger.bind(tag=TAG).debug(
+                                    f"开始发送TTS文本: {segment_text}"
+                                )
+                                future = asyncio.run_coroutine_threadsafe(
+                                    self.text_to_speak(segment_text, None),
+                                    loop=self.conn.loop,
+                                )
+                                future.result()
+                                logger.bind(tag=TAG).debug("TTS文本发送成功")
+                            except Exception as e:
+                                logger.bind(tag=TAG).error(f"发送TTS文本失败: {str(e)}")
+                                continue
 
                 elif ContentType.FILE == message.content_type:
                     logger.bind(tag=TAG).info(
@@ -150,6 +160,19 @@ class TTSProvider(TTSProviderBase):
 
                 if message.sentence_type == SentenceType.LAST:
                     try:
+                        # 发送缓冲区中剩余的文本
+                        full_text = "".join(self.tts_text_buff)
+                        remaining = full_text[self.processed_chars:]
+                        if remaining:
+                            from core.utils import textUtils
+                            remaining_clean = textUtils.get_string_no_punctuation_or_emoji(remaining)
+                            if remaining_clean:
+                                future = asyncio.run_coroutine_threadsafe(
+                                    self.text_to_speak(remaining_clean, None),
+                                    loop=self.conn.loop,
+                                )
+                                future.result()
+
                         logger.bind(tag=TAG).info("开始结束TTS会话...")
                         future = asyncio.run_coroutine_threadsafe(
                             self.finish_session(self.conn.sentence_id),
