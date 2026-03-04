@@ -123,7 +123,7 @@ class VisionHandler(BaseHandler):
 
             return_json = {
                 "success": True,
-                "action": Action.RESPONSE.name,
+                "action": Action.REQLLM.name,
                 "response": result,
             }
 

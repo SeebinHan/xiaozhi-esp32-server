@@ -807,8 +807,9 @@ class ConnectionHandler:
             self.sentence_id = str(uuid.uuid4().hex)
 
             # 注入视觉上下文（摄像头拍照分析结果，30秒内有效）
-            if self.visual_context and time.time() - self.visual_context_time < 30:
-                query = f"[用户当前状态: {self.visual_context}] {query}"
+            if self.visual_context and time.time() - self.visual_context_time < 60:
+                query = f"【视觉观察】我看到：{self.visual_context}\n【用户说】{query}"
+                self.logger.bind(tag=TAG).info(f"注入视觉上下文: {self.visual_context}")
                 self.visual_context = None  # 用完即清，避免重复注入
 
             self.dialogue.put(Message(role="user", content=query))

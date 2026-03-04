@@ -50,9 +50,11 @@ class DeviceMCPExecutor(ToolExecutor):
                 and isinstance(resultJson, dict)
                 and "action" in resultJson
             ):
+                resp_text = resultJson.get("response", "")
                 return ActionResponse(
                     action=Action[resultJson["action"]],
-                    response=resultJson.get("response", ""),
+                    result=resp_text,
+                    response=resp_text,
                 )
 
             return ActionResponse(action=Action.REQLLM, result=str(result))

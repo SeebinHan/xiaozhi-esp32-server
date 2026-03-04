@@ -240,6 +240,8 @@ async def _do_send_audio(conn, opus_packet, flow_control):
     packet_index = flow_control.get("packet_count", 0)
     sequence = flow_control.get("sequence", 0)
 
+    conn.logger.bind(tag=TAG).debug(f"音频帧发送, pkt={packet_index}, size={len(opus_packet)}")
+
     if conn.conn_from_mqtt_gateway:
         # 计算时间戳（基于播放位置）
         start_time = time.time()
