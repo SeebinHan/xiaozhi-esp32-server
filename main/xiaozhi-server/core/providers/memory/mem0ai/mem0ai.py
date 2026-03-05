@@ -41,7 +41,7 @@ class MemoryProvider(MemoryProviderBase):
                 for message in msgs
                 if message.role != "system"
             ]
-            result = self.client.add(messages, user_id=self.role_id)
+            result = self.client.add(messages, user_id=self.role_id, version="v2")
             logger.bind(tag=TAG).debug(f"Save memory result: {result}")
         except Exception as e:
             logger.bind(tag=TAG).error(f"保存记忆失败: {str(e)}")
@@ -53,10 +53,12 @@ class MemoryProvider(MemoryProviderBase):
         try:
             if not getattr(self, "role_id", None):
                 return ""
+            if not query or not query.strip():
+                return ""
 
             filters = {"user_id": self.role_id}
 
-            results = self.client.search(query, filters=filters)
+            results = self.client.search(query, filters=filters, version="v2")
             if not results or "results" not in results:
                 return ""
 
